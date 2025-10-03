@@ -1,5 +1,5 @@
 #!/bin/sh
-'''exec' "/home/siphesihle-nyawo/PersonalWork/Full stack Financial Visualisation /backend/venv/bin/python3" "$0" "$@"
+'''exec' "/home/siphesihle-nyawo/PersonalWork/Full stack Financial Visualisation/backend/venv/bin/python3" "$0" "$@"
 ' '''
 # -*- coding: utf-8 -*-
 import re

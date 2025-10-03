@@ -1,0 +1,193 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+    <title>Finance Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h2>Upload Financial Data</h2>
+    <form id="uploadForm">
+        <input type="file" id="file" accept=".xlsx" required>
+        <input type="text" id="userId" placeholder="User ID" required>
+        <input type="text" id="year" placeholder="Year" required>
+        <button type="submit">Upload</button>
+    </form>
+
+    <h2>Dashboard</h2>
+    <table border="1" id="dataTable"></table>
+    <canvas id="barChart" width="400" height="200"></canvas>
+
+<script>
+document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    let file = document.getElementById("file").files[0];
+    let userId = document.getElementById("userId").value;
+    let year = document.getElementById("year").value;
+
+    let formData = new FormData();
+    formData.append("file", file);
+
+    await fetch(`http://127.0.0.1:5000/api/finances/upload/${userId}/${year}`, {
+        method: "POST",
+        body: formData
+    });
+
+    // Fetch data for dashboard
+    let res = await fetch(`http://127.0.0.1:5000/api/finances/${userId}/${year}`);
+    let data = await res.json();
+
+    // Display table
+    let table = document.getElementById("dataTable");
+    table.innerHTML = "<tr><th>Month</th><th>Amount</th></tr>";
+    let labels = [], values = [];
+    data.forEach(r => {
+        table.innerHTML += `<tr><td>${r.month}</td><td>${r.amount}</td></tr>`;
+        labels.push(r.month);
+        values.push(r.amount);
+    });
+
+
+    new Chart(document.getElementById("barChart"), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Monthly Amount",
+                data: values
+            }]
+        }
+    });
+});
+</script>
+</body>
+</html> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h2 {
+            margin-top: 30px;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        input, button {
+            margin: 5px;
+            padding: 8px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 50%;
+            margin-top: 10px;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: center;
+        }
+        canvas {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Upload Financial Data</h2>
+    <form id="uploadForm">
+        <input type="file" id="file" accept=".xlsx" required>
+        <input type="text" id="userId" placeholder="User ID" required>
+        <input type="text" id="year" placeholder="Year" required>
+        <button type="submit">Upload</button>
+    </form>
+
+    <h2>Dashboard</h2>
+    <table id="dataTable">
+        <thead>
+            <tr><th>Month</th><th>Amount</th></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <canvas id="barChart" width="600" height="300"></canvas>
+
+    <script>
+        document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            let file = document.getElementById("file").files[0];
+            let userId = document.getElementById("userId").value.trim();
+            let year = document.getElementById("year").value.trim();
+
+            if (!file || !userId || !year) {
+                alert("Please fill in all fields and select a file.");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                // Upload the file
+                await fetch(`http://127.0.0.1:5000/api/finances/upload/${userId}/${year}`, {
+                    method: "POST",
+                    body: formData
+                });
+
+                // Fetch dashboard data
+                let res = await fetch(`http://127.0.0.1:5000/api/finances/${userId}/${year}`);
+                let data = await res.json();
+
+                // Populate table
+                let tableBody = document.querySelector("#dataTable tbody");
+                tableBody.innerHTML = "";
+                let labels = [], values = [];
+
+                data.forEach(r => {
+                    let row = `<tr><td>${r.month}</td><td>${r.amount}</td></tr>`;
+                    tableBody.innerHTML += row;
+                    labels.push(r.month);
+                    values.push(r.amount);
+                });
+
+                // Render chart
+                let ctx = document.getElementById("barChart").getContext("2d");
+                if (window.barChartInstance) {
+                    window.barChartInstance.destroy(); // prevent multiple charts overlapping
+                }
+                window.barChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: "Monthly Amount",
+                            data: values,
+                            backgroundColor: "rgba(54, 162, 235, 0.6)",
+                            borderColor: "rgba(54, 162, 235, 1)",
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } catch (err) {
+                console.error("Error:", err);
+                alert("Something went wrong while uploading or fetching data.");
+            }
+        });
+    </script>
+</body>
+</html>
