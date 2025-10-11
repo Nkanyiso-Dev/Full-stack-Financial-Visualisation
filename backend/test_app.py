@@ -10,8 +10,8 @@ class FinancialAppTestCase(unittest.TestCase):
         - Creates tables and inserts one dummy financial record.
         """
         app.config['TESTING'] = True
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'  # isolated DB
-        self.app = app.test_client()  # test client to simulate HTTP requests
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'  
+        self.app = app.test_client()
         with app.app_context():
             db.create_all()
             test_record = FinancialRecord(description="Test record", amount=100.0)
@@ -34,9 +34,9 @@ class FinancialAppTestCase(unittest.TestCase):
         - Verifies the dummy record we inserted is returned.
         """
         response = self.app.get('/records')
-        self.assertEqual(response.status_code, 200)  # check response is OK
+        self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
-        self.assertEqual(len(data), 1)  # only one record should exist
+        self.assertEqual(len(data), 1) 
         self.assertEqual(data[0]['description'], "Test record")
         self.assertEqual(data[0]['amount'], 100.0)
 
@@ -52,12 +52,12 @@ class FinancialAppTestCase(unittest.TestCase):
             data=json.dumps({'description': 'New record', 'amount': 250.0}),
             content_type='application/json'
         )
-        self.assertEqual(response.status_code, 201)  # record should be created
+        self.assertEqual(response.status_code, 201)
 
-        # Check that the new record exists now
+        
         get_response = self.app.get('/records')
         data = json.loads(get_response.data)
-        self.assertEqual(len(data), 2)  # should be 2 records now
+        self.assertEqual(len(data), 2)
         self.assertEqual(data[1]['description'], 'New record')
         self.assertEqual(data[1]['amount'], 250.0)
 
@@ -69,11 +69,10 @@ class FinancialAppTestCase(unittest.TestCase):
         """
         response = self.app.post(
             '/records',
-            data=json.dumps({'description': 'Broken record'}),  # amount is missing
+            data=json.dumps({'description': 'Broken record'}),
             content_type='application/json'
         )
-        # Depending on your app, this might fail (e.g., 500 error instead of 400).
-        # That's OK — you can show in the interview that the test caught a problem.
+        
         self.assertEqual(response.status_code, 400)  
 
 if __name__ == '__main__':
