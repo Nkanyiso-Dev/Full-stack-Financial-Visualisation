@@ -9,8 +9,8 @@ CORS(app)
 def get_db_connection():
     return mysql.connector.connect(
         host="localhost",
-        user="root",
-        password="", 
+        user="root-user",
+        password="Nkanyiso", 
         database="finance_db"
     )
 
@@ -79,8 +79,8 @@ def upload_file(user_id, year):
 
 @app.route('/api/finances/<int:user_id>/<int:year>', methods=['GET'])
 def get_records(user_id, year):
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    conn = None 
+    cursor = None
 
     try:
         cursor.execute("""
@@ -94,8 +94,11 @@ def get_records(user_id, year):
         print(f"Data retrieval error: {e}")
         return jsonify({"error": "Database error occurred"}), 500
     finally:
-        cursor.close()
-        conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+        
 
     return jsonify(records), 200
 
