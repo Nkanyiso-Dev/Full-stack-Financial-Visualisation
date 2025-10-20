@@ -13,12 +13,17 @@ def get_db_connection(testing=False):
     """
     db_name = "finance_test_db" if testing else "finance_db"
 
-    return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="MyStrongPass123!",
-        database=db_name
-    )
+    try:
+        conn = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="MyStrongPass123!",
+            database=db_name
+        )
+        return conn
+    except mysql.connector.Error as e:
+        print(f"DB connection error: {e}")
+        return None
 
 
 @app.route('/api/finances/upload/<int:user_id>/<int:year>', methods=['POST'])
@@ -37,16 +42,13 @@ def upload_file(user_id, year):
         print(f"Excel load error: {e}")
         return jsonify({"error": "Invalid Excel file format"}), 400
 
-    try:
-        conn = get_db_connection()
-        if conn is None:
-            raise Exception("Database connection failed")
-
-        cursor = conn.cursor(dictionary=True)
-    except Exception as e:
-        print(f"DB connection error: {e}")
+    # Use testing DB if app is in testing mode
+    testing = app.config.get('TESTING', False)
+    conn = get_db_connection(testing=testing)
+    if conn is None:
         return jsonify({"error": "Could not connect to the database"}), 500
 
+    cursor = conn.cursor(dictionary=True)
     inserted = 0
     skipped = 0
 
@@ -99,7 +101,12 @@ def upload_file(user_id, year):
 
 @app.route('/api/finances/<int:user_id>/<int:year>', methods=['GET'])
 def get_records(user_id, year):
-    conn = get_db_connection()
+    # Use testing DB if app is in testing mode
+    testing = app.config.get('TESTING', False)
+    conn = get_db_connection(testing=testing)
+    if conn is None:
+        return jsonify({"error": "Could not connect to the database"}), 500
+
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("""
@@ -113,9 +120,13 @@ def get_records(user_id, year):
         print(f"Data retrieval error: {e}")
         return jsonify({"error": "Database error occurred"}), 500
     finally:
-        cursor.close()
-        conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
         
     return jsonify(records), 200
+
+
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1', port=5000)

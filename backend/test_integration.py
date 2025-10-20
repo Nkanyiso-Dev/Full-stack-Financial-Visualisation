@@ -1,12 +1,28 @@
 import unittest
 import mysql.connector
 from io import BytesIO
+import openpyxl
 from app import app, get_db_connection
+
+def create_test_db():
+    """Ensure the test database exists."""
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="MyStrongPass123!"
+    )
+    cursor = conn.cursor()
+    cursor.execute("CREATE DATABASE IF NOT EXISTS finance_test_db;")
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 class FinanceIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Run once before all tests."""
+        create_test_db()  # Ensure test DB exists
+
         cls.conn = get_db_connection(testing=True)
         cls.cursor = cls.conn.cursor()
 
@@ -48,8 +64,7 @@ class FinanceIntegrationTests(unittest.TestCase):
 
     def test_full_upload_and_fetch(self):
         """Should upload Excel file and retrieve same data."""
-        # Create an in-memory Excel file
-        import openpyxl
+        # Create a valid in-memory Excel file
         workbook = openpyxl.Workbook()
         sheet = workbook.active
         sheet.append(["Month", "Amount"])
