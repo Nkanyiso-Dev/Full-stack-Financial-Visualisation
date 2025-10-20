@@ -6,13 +6,20 @@ import openpyxl
 app = Flask(__name__)
 CORS(app)
 
-def get_db_connection():
+def get_db_connection(testing=False):
+    """
+    Returns a MySQL database connection.
+    If testing=True, connects to the test database instead.
+    """
+    db_name = "finance_test_db" if testing else "finance_db"
+
     return mysql.connector.connect(
         host="localhost",
-        user="root-user",
-        password="Nkanyiso", 
-        database="finance_db"
+        user="root",
+        password="MyStrongPass123!",
+        database=db_name
     )
+
 
 @app.route('/api/finances/upload/<int:user_id>/<int:year>', methods=['POST'])
 def upload_file(user_id, year):
@@ -30,8 +37,8 @@ def upload_file(user_id, year):
         print(f"Excel load error: {e}")
         return jsonify({"error": "Invalid Excel file format"}), 400
 
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    conn = None
+    cursor = None
 
     inserted = 0
     skipped = 0
@@ -79,9 +86,8 @@ def upload_file(user_id, year):
 
 @app.route('/api/finances/<int:user_id>/<int:year>', methods=['GET'])
 def get_records(user_id, year):
-    conn = None 
-    cursor = None
-
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("""
             SELECT u.name, f.month, f.amount
@@ -94,13 +100,9 @@ def get_records(user_id, year):
         print(f"Data retrieval error: {e}")
         return jsonify({"error": "Database error occurred"}), 500
     finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
+        cursor.close()
+        conn.close()
         
-
     return jsonify(records), 200
-
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1', port=5000)

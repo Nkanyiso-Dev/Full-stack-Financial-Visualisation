@@ -1,6 +1,6 @@
-CREATE DATABASE IF NOT EXISTS finance_db;
+CREATE DATABASE IF NOT EXISTS finance_test_db;
 
-USE finance_db;
+USE finance_test_db;
 
 CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -16,4 +16,4 @@ CREATE TABLE financial_records (
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
-INSERT INTO users (name) VALUES ('Jane Doe'), ('John Smith');
+INSERT INTO users (name) VALUES ('Test User');
