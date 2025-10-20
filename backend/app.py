@@ -37,8 +37,15 @@ def upload_file(user_id, year):
         print(f"Excel load error: {e}")
         return jsonify({"error": "Invalid Excel file format"}), 400
 
-    conn = None
-    cursor = None
+    try:
+        conn = get_db_connection()
+        if conn is None:
+            raise Exception("Database connection failed")
+
+        cursor = conn.cursor(dictionary=True)
+    except Exception as e:
+        print(f"DB connection error: {e}")
+        return jsonify({"error": "Could not connect to the database"}), 500
 
     inserted = 0
     skipped = 0
@@ -70,19 +77,25 @@ def upload_file(user_id, year):
 
         conn.commit()
         print(f"Upload: {inserted} inserted, {skipped} skipped for user {user_id}, year {year}")
+
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         print(f"Database error: {e}")
         return jsonify({"error": "Database error occurred"}), 500
+
     finally:
-        cursor.close()
-        conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
     return jsonify({
         "message": "Upload successful",
         "inserted": inserted,
         "skipped": skipped
     }), 201
+
 
 @app.route('/api/finances/<int:user_id>/<int:year>', methods=['GET'])
 def get_records(user_id, year):
