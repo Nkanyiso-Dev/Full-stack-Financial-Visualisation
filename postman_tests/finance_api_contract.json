@@ -21,21 +21,14 @@
           ]
         },
         "url": {
-          "raw": "http://127.0.0.1:5000/api/finances/upload/1/2025"
+          "raw": "http://127.0.0.1:5000/api/finances/upload/1/2025",
+          "protocol": "http",
+          "host": ["127.0.0.1"],
+          "port": "5000",
+          "path": ["api", "finances", "upload", "1", "2025"]
         }
       },
-      "response": [
-        {
-          "code": 201,
-          "name": "Created",
-          "body": "{\"message\": \"Upload processed\", \"inserted\": 2, \"skipped\": 0}"
-        },
-        {
-          "code": 400,
-          "name": "Invalid Input",
-          "body": "{\"error\": \"Invalid Excel file format\"}"
-        }
-      ]
+      "response": []
     },
     {
       "name": "Get Financial Records",
@@ -43,21 +36,14 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "http://127.0.0.1:5000/api/finances/1/2025"
+          "raw": "http://127.0.0.1:5000/api/finances/1/2025",
+          "protocol": "http",
+          "host": ["127.0.0.1"],
+          "port": "5000",
+          "path": ["api", "finances", "1", "2025"]
         }
       },
-      "response": [
-        {
-          "code": 200,
-          "name": "OK",
-          "body": "[{\"name\": \"Test User\", \"month\": \"January\", \"amount\": 1000.50}]"
-        },
-        {
-          "code": 500,
-          "name": "Database Error",
-          "body": "{\"error\": \"Database connection failed\"}"
-        }
-      ]
+      "response": []
     }
   ]
 }
