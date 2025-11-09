@@ -1,0 +1,71 @@
+{
+  "info": {
+    "name": "Finance API Contract",
+    "_postman_id": "f9e7b38e-2b7e-45cd-b79d-4b9ac349de4b",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Upload Excel File",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "test_data.xlsx"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://127.0.0.1:5000/api/finances/upload/:user_id/:year",
+          "protocol": "http",
+          "host": ["127.0.0.1"],
+          "port": "5000",
+          "path": ["api", "finances", "upload", ":user_id", ":year"]
+        }
+      },
+      "response": [
+        {
+          "code": 201,
+          "name": "Created",
+          "body": "{\"message\": \"Upload processed\", \"inserted\": 2, \"skipped\": 0}"
+        },
+        {
+          "code": 400,
+          "name": "Invalid Input",
+          "body": "{\"error\": \"Invalid Excel file format\"}"
+        }
+      ]
+    },
+    {
+      "name": "Get Financial Records",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://127.0.0.1:5000/api/finances/1/2025",
+          "protocol": "http",
+          "host": ["127.0.0.1"],
+          "port": "5000",
+          "path": ["api", "finances", "1", "2025"]
+        }
+      },
+      "response": [
+        {
+          "code": 200,
+          "name": "OK",
+          "body": "[{\"name\": \"Test User\", \"month\": \"January\", \"amount\": 1000.50}]"
+        },
+        {
+          "code": 500,
+          "name": "Database Error",
+          "body": "{\"error\": \"Database connection failed\"}"
+        }
+      ]
+    }
+  ]
+}
