@@ -16,16 +16,12 @@
             {
               "key": "file",
               "type": "file",
-              "src": "test_data.xlsx"
+              "src": "postman_tests/test_data.xlsx"
             }
           ]
         },
         "url": {
-          "raw": "http://127.0.0.1:5000/api/finances/upload/:user_id/:year",
-          "protocol": "http",
-          "host": ["127.0.0.1"],
-          "port": "5000",
-          "path": ["api", "finances", "upload", ":user_id", ":year"]
+          "raw": "http://127.0.0.1:5000/api/finances/upload/1/2025"
         }
       },
       "response": [
@@ -47,11 +43,7 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "http://127.0.0.1:5000/api/finances/1/2025",
-          "protocol": "http",
-          "host": ["127.0.0.1"],
-          "port": "5000",
-          "path": ["api", "finances", "1", "2025"]
+          "raw": "http://127.0.0.1:5000/api/finances/1/2025"
         }
       },
       "response": [
