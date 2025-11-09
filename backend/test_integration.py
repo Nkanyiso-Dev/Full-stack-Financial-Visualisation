@@ -5,7 +5,7 @@ import openpyxl
 from app import app, get_db_connection
 
 def create_test_db():
-    """Ensure the test database exists."""
+    """Ensure the test database and required tables exist."""
     conn = mysql.connector.connect(
         host="localhost",
         user="root",
@@ -20,42 +20,51 @@ def create_test_db():
 class FinanceIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        """Run once before all tests."""
-        create_test_db()  # Ensure test DB exists
+        """Set up test environment before all tests."""
+        # Create test DB if not present
+        create_test_db()
+        app.config['TESTING'] = True
 
+        # Connect to test DB
         cls.conn = get_db_connection(testing=True)
+        if cls.conn is None:
+            raise RuntimeError("Could not connect to test database in setUpClass")
+
         cls.cursor = cls.conn.cursor()
 
-        # Create tables for testing
+        # Drop tables if they exist to ensure a clean start
+        cls.cursor.execute("DROP TABLE IF EXISTS financial_records;")
+        cls.cursor.execute("DROP TABLE IF EXISTS users;")
+
+        # Recreate the tables using your SQL schema
         cls.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INT PRIMARY KEY AUTO_INCREMENT,
-                name VARCHAR(100)
+            CREATE TABLE users (
+                user_id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(100) NOT NULL
             );
         """)
+
         cls.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS financial_records (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+            CREATE TABLE financial_records (
+                record_id INT AUTO_INCREMENT PRIMARY KEY,
                 user_id INT,
                 year INT,
                 month VARCHAR(20),
-                amount DECIMAL(10, 2),
+                amount DECIMAL(10,2),
                 FOREIGN KEY (user_id) REFERENCES users(user_id)
             );
         """)
-        cls.conn.commit()
 
-        # Insert a test user
-        cls.cursor.execute("INSERT INTO users (name) VALUES ('Test User')")
+        # Insert the test user
+        cls.cursor.execute("INSERT INTO users (name) VALUES ('Test User');")
         cls.conn.commit()
         cls.user_id = cls.cursor.lastrowid
 
-        app.config['TESTING'] = True
         cls.client = app.test_client()
 
     @classmethod
     def tearDownClass(cls):
-        """Clean up after all tests."""
+        """Clean up database after tests."""
         cls.cursor.execute("DROP TABLE IF EXISTS financial_records;")
         cls.cursor.execute("DROP TABLE IF EXISTS users;")
         cls.conn.commit()
@@ -67,9 +76,10 @@ class FinanceIntegrationTests(unittest.TestCase):
         # Create a valid in-memory Excel file
         workbook = openpyxl.Workbook()
         sheet = workbook.active
+        sheet.title = "FinancialData"
         sheet.append(["Month", "Amount"])
-        sheet.append(["January", 1000])
-        sheet.append(["February", 2000])
+        sheet.append(["January", 1000.50])
+        sheet.append(["February", 2000.75])
 
         excel_file = BytesIO()
         workbook.save(excel_file)
@@ -82,12 +92,13 @@ class FinanceIntegrationTests(unittest.TestCase):
             content_type='multipart/form-data'
         )
 
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 201, response.get_json())
         self.assertIn('inserted', response.get_json())
 
         # Retrieve records
         response = self.client.get(f'/api/finances/{self.user_id}/2025')
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, response.get_json())
+
         data = response.get_json()
         self.assertIsInstance(data, list)
         self.assertGreater(len(data), 0)

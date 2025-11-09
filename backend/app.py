@@ -1,3 +1,5 @@
+import os
+from io import BytesIO
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import mysql.connector
@@ -6,26 +8,34 @@ import openpyxl
 app = Flask(__name__)
 CORS(app)
 
-def get_db_connection(testing=False):
-    """
-    Returns a MySQL database connection.
-    If testing=True, connects to the test database instead.
-    """
-    db_name = "finance_test_db" if testing else "finance_db"
+# === Configuration ===
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_USER = os.getenv("DB_USER", "root")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "MyStrongPass123!")
+DB_NAME = os.getenv("DB_NAME", "finance_db")
+TEST_DB_NAME = os.getenv("TEST_DB_NAME", "finance_test_db")
 
+
+# === Database Connection ===
+def get_db_connection(testing=False):
+    """Return a MySQL connection. Uses test DB if testing=True."""
+    db_name = TEST_DB_NAME if testing else DB_NAME
     try:
         conn = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="MyStrongPass123!",
-            database=db_name
+            host=DB_HOST,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=db_name,
+            autocommit=True
         )
         return conn
     except mysql.connector.Error as e:
-        print(f"DB connection error: {e}")
+        if not app.config.get("TESTING"):
+            print(f"DB connection error ({db_name}): {e}")
         return None
 
 
+# === Upload Excel File ===
 @app.route('/api/finances/upload/<int:user_id>/<int:year>', methods=['POST'])
 def upload_file(user_id, year):
     if 'file' not in request.files:
@@ -35,98 +45,101 @@ def upload_file(user_id, year):
     if file.filename == '':
         return jsonify({"error": "Empty filename"}), 400
 
+    # Validate Excel file
     try:
-        workbook = openpyxl.load_workbook(file)
+        file_bytes = file.read()
+        workbook = openpyxl.load_workbook(BytesIO(file_bytes))
         sheet = workbook.active
-    except Exception as e:
-        print(f"Excel load error: {e}")
+    except Exception:
         return jsonify({"error": "Invalid Excel file format"}), 400
 
-    # Use testing DB if app is in testing mode
     testing = app.config.get('TESTING', False)
     conn = get_db_connection(testing=testing)
     if conn is None:
-        return jsonify({"error": "Could not connect to the database"}), 500
+        return jsonify({"error": "Database connection failed"}), 500
 
     cursor = conn.cursor(dictionary=True)
-    inserted = 0
-    skipped = 0
+    inserted, skipped = 0, 0
 
     try:
         for idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
-            if row is None or len(row) < 2:
-                skipped += 1
-                continue
-            month, amount = row
-            if not isinstance(month, (str, int)) or not isinstance(amount, (int, float)):
+            if not row or len(row) < 2:
                 skipped += 1
                 continue
 
-            # Check for duplicate
-            cursor.execute("""
-                SELECT 1 FROM financial_records
-                WHERE user_id = %s AND year = %s AND month = %s
-            """, (user_id, year, month))
+            month, amount = row[0], row[1]
+            if month is None or amount is None:
+                skipped += 1
+                continue
+
+            try:
+                amount = float(amount)
+            except Exception:
+                skipped += 1
+                continue
+
+            cursor.execute(
+                "SELECT 1 FROM financial_records WHERE user_id = %s AND year = %s AND month = %s",
+                (user_id, year, str(month))
+            )
             if cursor.fetchone():
                 skipped += 1
                 continue
 
-            cursor.execute("""
-                INSERT INTO financial_records (user_id, year, month, amount)
-                VALUES (%s, %s, %s, %s)
-            """, (user_id, year, month, amount))
+            cursor.execute(
+                "INSERT INTO financial_records (user_id, year, month, amount) VALUES (%s, %s, %s, %s)",
+                (user_id, year, str(month), amount)
+            )
             inserted += 1
 
         conn.commit()
-        print(f"Upload: {inserted} inserted, {skipped} skipped for user {user_id}, year {year}")
-
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        print(f"Database error: {e}")
-        return jsonify({"error": "Database error occurred"}), 500
-
+    except mysql.connector.Error as e:
+        if not app.config.get("TESTING"):
+            print(f"DB insert error: {e}")
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
+        cursor.close()
+        conn.close()
 
     return jsonify({
-        "message": "Upload successful",
+        "message": "Upload processed",
         "inserted": inserted,
         "skipped": skipped
     }), 201
 
 
+# === Get Records ===
 @app.route('/api/finances/<int:user_id>/<int:year>', methods=['GET'])
 def get_records(user_id, year):
-    # Use testing DB if app is in testing mode
     testing = app.config.get('TESTING', False)
     conn = get_db_connection(testing=testing)
     if conn is None:
-        return jsonify({"error": "Could not connect to the database"}), 500
+        return jsonify({"error": "Database connection failed"}), 500
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = None
     try:
+        cursor = conn.cursor(dictionary=True)
         cursor.execute("""
             SELECT u.name, f.month, f.amount
             FROM financial_records f
-            JOIN users u ON f.user_id = u.user_id
+            LEFT JOIN users u ON f.user_id = u.user_id
             WHERE f.user_id = %s AND f.year = %s
         """, (user_id, year))
         records = cursor.fetchall()
-    except Exception as e:
-        print(f"Data retrieval error: {e}")
-        return jsonify({"error": "Database error occurred"}), 500
+    except mysql.connector.Error as e:
+        # ✅ No printing in testing mode
+        if not app.config.get("TESTING"):
+            print(f"Data retrieval error: {e}")
+        return jsonify({"error": str(e)}), 500
     finally:
         if cursor:
             cursor.close()
-        if conn:
-            conn.close()
-        
+        conn.close()
+
     return jsonify(records), 200
 
 
+# === Run App ===
 if __name__ == '__main__':
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    app.run(host='127.0.0.1', port=5000)
