@@ -1,1 +1,4 @@
-Month,Amount\nJanuary,1000.50\nFebruary,1200.00
+| Month    | Amount  |
+| -------- | ------- |
+| January  | 1000.50 |
+| February | 1200.00 |

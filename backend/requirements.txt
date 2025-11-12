@@ -1,0 +1,6 @@
+Flask==2.3.3
+flask-cors==3.0.10
+mysql-connector-python==8.1.0
+openpyxl==3.1.2
+# optional for production start: gunicorn
+gunicorn==20.1.0

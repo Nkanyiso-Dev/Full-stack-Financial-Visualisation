@@ -7,6 +7,24 @@
   "item": [
     {
       "name": "Upload Excel File",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Response should be 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "pm.test('Response should contain inserted and skipped counts', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('inserted');",
+              "    pm.expect(jsonData).to.have.property('skipped');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
       "request": {
         "method": "POST",
         "header": [],
@@ -16,15 +34,13 @@
             {
               "key": "file",
               "type": "file",
-              "src": "postman_tests/test_data.xlsx"
+              "src": "./postman_tests/test_data.xlsx"
             }
           ]
         },
         "url": {
-          "raw": "http://127.0.0.1:5000/api/finances/upload/1/2025",
-          "protocol": "http",
-          "host": ["127.0.0.1"],
-          "port": "5000",
+          "raw": "{{baseUrl}}/api/finances/upload/1/2025",
+          "host": ["{{baseUrl}}"],
           "path": ["api", "finances", "upload", "1", "2025"]
         }
       },
@@ -32,18 +48,39 @@
     },
     {
       "name": "Get Financial Records",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Response should be 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Response should be a valid JSON array', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.be.an('array');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
       "request": {
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "http://127.0.0.1:5000/api/finances/1/2025",
-          "protocol": "http",
-          "host": ["127.0.0.1"],
-          "port": "5000",
+          "raw": "{{baseUrl}}/api/finances/1/2025",
+          "host": ["{{baseUrl}}"],
           "path": ["api", "finances", "1", "2025"]
         }
       },
       "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:5000"
     }
   ]
 }

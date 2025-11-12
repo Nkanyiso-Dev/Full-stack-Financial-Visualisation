@@ -1,66 +1,23 @@
-name: API Contract Tests
-
-on:
-  push:
-    branches:
-      - main
-      - dev
-  pull_request:
-    branches:
-      - main
-
-jobs:
-  test-api:
-    runs-on: ubuntu-latest
-
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: MyStrongPass123!
-          MYSQL_DATABASE: finance_test_db
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          pip install -r backend/requirements.txt
-
-      - name: Start Flask app in background
-        run: |
-          source venv/bin/activate
-          export FLASK_APP=backend/app.py
-          nohup flask run --host=0.0.0.0 --port=5000 &
-          sleep 10
-
-      - name: Install Newman
-        run: npm install -g newman
-
-      - name: Run Postman Tests
-        run: |
-          newman run postman_tests/finance_api_contract.json \
-            --env-var base_url=http://127.0.0.1:5000 \
-            --reporters cli,html \
-            --reporter-html-export results.html
-
-      - name: Upload Test Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: postman-test-report
-          path: results.html
+- name: Start Flask app in background
+  env:
+    FLASK_APP: backend/app.py
+    FLASK_ENV: development
+    DB_HOST: 127.0.0.1
+    DB_USER: root
+    DB_PASSWORD: MyStrongPass123!
+    DB_NAME: finance_test_db
+    TEST_DB_NAME: finance_test_db
+  run: |
+    source venv/bin/activate
+    pip install -r backend/requirements.txt
+    # wait for MySQL to be reachable
+    for i in {1..30}; do
+      if nc -z 127.0.0.1 3306; then
+        echo "MySQL is up"
+        break
+      fi
+      echo "Waiting for MySQL..."
+      sleep 2
+    done
+    nohup python -m flask run --host=0.0.0.0 --port=5000 > flask.log 2>&1 &
+    sleep 5
