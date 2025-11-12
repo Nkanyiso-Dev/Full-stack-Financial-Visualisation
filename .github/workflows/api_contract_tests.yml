@@ -1,4 +1,4 @@
-name: API contract tests
+name: API contract / unit tests
 
 on:
   push:
@@ -32,13 +32,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Create virtual environment
-        run: python -m venv venv
-
-      - name: Install dependencies
+      - name: Create virtual environment and install dependencies
         run: |
-          source venv/bin/activate
-          pip install -r backend/requirements.txt
+          python -m venv venv
+          ./venv/bin/python -m pip install --upgrade pip
+          if [ -f backend/requirements.txt ]; then
+            ./venv/bin/python -m pip install -r backend/requirements.txt
+          fi
 
       - name: Wait for MySQL
         run: |
@@ -61,15 +61,22 @@ jobs:
           DB_NAME: finance_test_db
           TEST_DB_NAME: finance_test_db
         run: |
-          source venv/bin/activate
-          nohup python -m flask run --host=0.0.0.0 --port=5000 > flask.log 2>&1 &
+          ./venv/bin/python -m flask run --host=0.0.0.0 --port=5000 > flask.log 2>&1 &
           sleep 5
 
-      - name: Run API contract tests
+      - name: Debug: list test files and Python info
+        run: |
+          echo "Listing likely test files:"
+          find . -type f -name "test*.py" -print || true
+          echo "Which python:"
+          ./venv/bin/python -c "import sys; print(sys.executable)"
+          echo "pip list:"
+          ./venv/bin/python -m pip list
+
+      - name: Run unit tests (unittest)
         env:
           CI: true
         run: |
-          source venv/bin/activate
-          # Replace with your actual contract test command:
-          # e.g., pytest tests/contract or npm run test:contract
-          pytest tests/contract
+          # discover and run unittest tests
+          # discover will look for test*.py under current directory by default
+          ./venv/bin/python -m unittest discover -v
