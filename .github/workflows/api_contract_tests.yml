@@ -1,23 +1,75 @@
-- name: Start Flask app in background
-  env:
-    FLASK_APP: backend/app.py
-    FLASK_ENV: development
-    DB_HOST: 127.0.0.1
-    DB_USER: root
-    DB_PASSWORD: MyStrongPass123!
-    DB_NAME: finance_test_db
-    TEST_DB_NAME: finance_test_db
-  run: |
-    source venv/bin/activate
-    pip install -r backend/requirements.txt
-    # wait for MySQL to be reachable
-    for i in {1..30}; do
-      if nc -z 127.0.0.1 3306; then
-        echo "MySQL is up"
-        break
-      fi
-      echo "Waiting for MySQL..."
-      sleep 2
-    done
-    nohup python -m flask run --host=0.0.0.0 --port=5000 > flask.log 2>&1 &
-    sleep 5
+name: API contract tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  api_contract_tests:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: MyStrongPass123!
+          MYSQL_DATABASE: finance_test_db
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s --health-timeout=5s --health-retries=6
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Create virtual environment
+        run: python -m venv venv
+
+      - name: Install dependencies
+        run: |
+          source venv/bin/activate
+          pip install -r backend/requirements.txt
+
+      - name: Wait for MySQL
+        run: |
+          for i in {1..30}; do
+            if nc -z 127.0.0.1 3306; then
+              echo "MySQL is up"
+              break
+            fi
+            echo "Waiting for MySQL..."
+            sleep 2
+          done
+
+      - name: Start Flask app in background
+        env:
+          FLASK_APP: backend/app.py
+          FLASK_ENV: development
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: MyStrongPass123!
+          DB_NAME: finance_test_db
+          TEST_DB_NAME: finance_test_db
+        run: |
+          source venv/bin/activate
+          nohup python -m flask run --host=0.0.0.0 --port=5000 > flask.log 2>&1 &
+          sleep 5
+
+      - name: Run API contract tests
+        env:
+          CI: true
+        run: |
+          source venv/bin/activate
+          # Replace with your actual contract test command:
+          # e.g., pytest tests/contract or npm run test:contract
+          pytest tests/contract
