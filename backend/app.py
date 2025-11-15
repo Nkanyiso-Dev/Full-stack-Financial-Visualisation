@@ -45,14 +45,73 @@ def upload_file(user_id, year):
     if file.filename == '':
         return jsonify({"error": "Empty filename"}), 400
 
-    # Validate Excel file
-    try:
-        file_bytes = file.read()
-        workbook = openpyxl.load_workbook(BytesIO(file_bytes))
-        sheet = workbook.active
-    except Exception:
-        return jsonify({"error": "Invalid Excel file format"}), 400
+    raw_bytes = file.read()
+    filename = file.filename.lower()
+    rows = []
 
+    # -----------------------------
+    # MAGIC BYTE DETECTION
+    # -----------------------------
+    def is_xlsx(data):
+        # XLSX files start with PK (zip file magic bytes)
+        return data[:2] == b'PK'
+
+    def is_probably_csv(data):
+        try:
+            decoded = data.decode("utf-8")
+            return True
+        except:
+            return False
+
+    # -----------------------------
+    # 1) XLSX DETECTED (real Excel)
+    # -----------------------------
+    if is_xlsx(raw_bytes):
+        try:
+            workbook = openpyxl.load_workbook(BytesIO(raw_bytes))
+            sheet = workbook.active
+
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                if not row or len(row) < 2:
+                    continue
+                rows.append((row[0], row[1]))
+
+        except Exception as e:
+            return jsonify({"error": f"Invalid XLSX file: {str(e)}"}), 400
+
+    # -----------------------------
+    # 2) CSV DETECTED (real CSV)
+    # -----------------------------
+    elif is_probably_csv(raw_bytes):
+        try:
+            decoded = raw_bytes.decode("utf-8")
+            import csv
+            reader = csv.reader(decoded.splitlines())
+
+            headers = next(reader, None)
+            if not headers or len(headers) < 2:
+                return jsonify({"error": "Invalid CSV format"}), 400
+
+            for row in reader:
+                if len(row) < 2:
+                    continue
+                rows.append((row[0], row[1]))
+
+        except Exception as e:
+            return jsonify({"error": f"CSV parse error: {str(e)}"}), 400
+
+    # -----------------------------
+    # 3) Unknown file type
+    # -----------------------------
+    else:
+        return jsonify({
+            "error": "Unsupported file format — must be CSV or XLSX",
+            "tip": "Even if renamed, file must be valid CSV or valid XLSX",
+        }), 400
+
+    # -----------------------------
+    # DATABASE INSERTION
+    # -----------------------------
     testing = app.config.get('TESTING', False)
     conn = get_db_connection(testing=testing)
     if conn is None:
@@ -62,19 +121,14 @@ def upload_file(user_id, year):
     inserted, skipped = 0, 0
 
     try:
-        for idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
-            if not row or len(row) < 2:
-                skipped += 1
-                continue
-
-            month, amount = row[0], row[1]
-            if month is None or amount is None:
+        for month, amount in rows:
+            if not month or not amount:
                 skipped += 1
                 continue
 
             try:
                 amount = float(amount)
-            except Exception:
+            except:
                 skipped += 1
                 continue
 
@@ -94,8 +148,6 @@ def upload_file(user_id, year):
 
         conn.commit()
     except mysql.connector.Error as e:
-        if not app.config.get("TESTING"):
-            print(f"DB insert error: {e}")
         conn.rollback()
         return jsonify({"error": str(e)}), 500
     finally:
@@ -105,8 +157,11 @@ def upload_file(user_id, year):
     return jsonify({
         "message": "Upload processed",
         "inserted": inserted,
-        "skipped": skipped
+        "skipped": skipped,
+        "rows_received": len(rows),
+        "file_detected_as": "xlsx" if is_xlsx(raw_bytes) else "csv"
     }), 201
+
 
 
 # === Get Records ===
