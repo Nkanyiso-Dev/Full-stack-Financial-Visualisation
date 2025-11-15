@@ -24,65 +24,64 @@ jobs:
           --health-retries=5
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: 3.12
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
 
-    - name: Install Python dependencies
-      run: |
-        python -m venv backend/venv
-        source backend/venv/bin/activate
-        pip install --upgrade pip
-        pip install -r backend/requirements.txt
+      - name: Install Python dependencies
+        run: |
+          python -m venv backend/venv
+          source backend/venv/bin/activate
+          pip install --upgrade pip
+          pip install -r backend/requirements.txt
 
-    - name: Install Newman
-      run: |
-        npm install -g newman newman-reporter-html
+      - name: Install Newman globally
+        run: npm install -g newman newman-reporter-html
 
-    - name: Start Flask app in background
-      env:
-        FLASK_APP: backend/app.py
-        FLASK_ENV: development
-        DB_HOST: 127.0.0.1
-        DB_USER: root
-        DB_PASSWORD: MyStrongPass123!
-        DB_NAME: finance_test_db
-        TEST_DB_NAME: finance_test_db
-      run: |
-        source backend/venv/bin/activate
-        # wait for MySQL to be reachable
-        for i in {1..30}; do
-          if nc -z 127.0.0.1 3306; then
-            echo "MySQL is up"
-            break
+      - name: Start Flask app in background
+        env:
+          FLASK_APP: backend/app.py
+          FLASK_ENV: development
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: MyStrongPass123!
+          DB_NAME: finance_test_db
+          TEST_DB_NAME: finance_test_db
+        run: |
+          source backend/venv/bin/activate
+          # wait for MySQL to be reachable
+          for i in {1..30}; do
+            if nc -z 127.0.0.1 3306; then
+              echo "MySQL is up"
+              break
+            fi
+            echo "Waiting for MySQL..."
+            sleep 2
+          done
+          nohup python -m flask run --host=0.0.0.0 --port=5000 > flask.log 2>&1 &
+          sleep 5
+
+      - name: Run Newman API contract tests
+        run: |
+          source backend/venv/bin/activate
+          newman run postman_tests/finance_api_contract.json \
+            -r html \
+            --reporter-html-export reports/finance_api_contract_report.html \
+            --suppress-exit-code
+
+      - name: Run Python contract tests
+        run: |
+          source backend/venv/bin/activate
+          if [ -d "backend/tests/contract" ]; then
+            pytest backend/tests/contract || true
           fi
-          echo "Waiting for MySQL..."
-          sleep 2
-        done
-        nohup python -m flask run --host=0.0.0.0 --port=5000 > flask.log 2>&1 &
-        sleep 5
 
-    - name: Run Newman API contract tests
-      run: |
-        source backend/venv/bin/activate
-        newman run postman_tests/finance_api_contract.json \
-          -r html \
-          --reporter-html-export reports/finance_api_contract_report.html \
-          --suppress-exit-code
-
-    - name: Run Python contract tests
-      run: |
-        source backend/venv/bin/activate
-        if [ -d "backend/tests/contract" ]; then
-          pytest backend/tests/contract || true
-        fi
-
-    - name: Upload Newman report as artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: finance-api-report
-        path: reports/finance_api_contract_report.html
+      - name: Upload Newman report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-api-report
+          path: reports/finance_api_contract_report.html
