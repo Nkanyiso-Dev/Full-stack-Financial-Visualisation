@@ -1,149 +1,515 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finance Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        h2 {
-            margin-top: 30px;
-        }
-        form {
-            margin-bottom: 20px;
-        }
-        input, button {
-            margin: 5px;
-            padding: 8px;
-        }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            max-width: 600px;
-            margin-top: 10px;
-        }
-        table, th, td {
-            border: 1px solid black;
-        }
-        th, td {
-            padding: 8px;
-            text-align: center;
-        }
-        canvas {
-            margin-top: 20px;
-        }
-        #resultMsg {
-            margin-bottom: 10px;
-            color: green;
-        }
-        #errorMsg {
-            margin-bottom: 10px;
-            color: red;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — Finance Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root{
+    --paper:#F7F5F0;
+    --surface:#FFFFFF;
+    --ink:#161A18;
+    --slate:#5B6560;
+    --hairline:#D8D3C8;
+    --emerald:#0E6E55;
+    --emerald-dark:#0A4F3D;
+    --alert:#A3342A;
+    --focus:#0E6E55;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding:32px 16px 80px;
+  }
+  .sheet{
+    max-width:880px;
+    margin:0 auto;
+    background:var(--surface);
+    border:1px solid var(--hairline);
+    box-shadow:0 1px 0 var(--hairline);
+  }
+  .letterhead{
+    padding:36px 40px 24px;
+    border-bottom:3px double var(--ink);
+  }
+  .letterhead .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--slate);
+    margin:0 0 6px;
+  }
+  .letterhead h1{
+    font-family:'Fraunces',serif;
+    font-optical-sizing:auto;
+    font-weight:500;
+    font-size:34px;
+    margin:0;
+    letter-spacing:-.01em;
+  }
+  .letterhead .subtitle{
+    font-size:14px;
+    color:var(--slate);
+    margin:8px 0 0;
+  }
+
+  section{padding:28px 40px;border-bottom:1px solid var(--hairline);}
+  section:last-child{border-bottom:none;}
+
+  h2.section-title{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--emerald-dark);
+    margin:0 0 18px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  h2.section-title::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background:var(--hairline);
+  }
+
+  /* --- Form --- */
+  .field-row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{
+    font-size:12px;
+    font-weight:600;
+    color:var(--slate);
+  }
+  .field input[type="number"], .field input[type="file"]{
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    padding:10px 12px;
+    border:1px solid var(--hairline);
+    background:var(--paper);
+    border-radius:2px;
+    color:var(--ink);
+  }
+  .field input:focus-visible{
+    outline:2px solid var(--focus);
+    outline-offset:1px;
+  }
+  .field.user-id input, .field.year input{width:120px;}
+  .field.file input{width:230px;}
+
+  button{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    padding:11px 20px;
+    border:1px solid var(--ink);
+    background:var(--ink);
+    color:var(--surface);
+    border-radius:2px;
+    cursor:pointer;
+    transition:background .15s ease, opacity .15s ease;
+  }
+  button:hover:not(:disabled){background:var(--emerald-dark);border-color:var(--emerald-dark);}
+  button:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+  button:disabled{opacity:.5;cursor:not-allowed;}
+  button.secondary{
+    background:transparent;
+    color:var(--ink);
+  }
+  button.secondary:hover:not(:disabled){background:var(--paper);border-color:var(--ink);}
+
+  .hint{font-size:12px;color:var(--slate);margin-top:10px;}
+
+  /* --- Status messages --- */
+  #status{
+    margin-top:16px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    padding:10px 12px;
+    border-left:3px solid transparent;
+    display:none;
+  }
+  #status.show{display:block;}
+  #status.success{border-color:var(--emerald);background:#EEF6F2;color:var(--emerald-dark);}
+  #status.error{border-color:var(--alert);background:#FBEDEB;color:var(--alert);}
+  #status.info{border-color:var(--slate);background:var(--paper);color:var(--slate);}
+
+  /* --- Summary cards --- */
+  .summary-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:1px;
+    background:var(--hairline);
+    border:1px solid var(--hairline);
+  }
+  .summary-card{
+    background:var(--surface);
+    padding:16px 18px;
+  }
+  .summary-card .label{
+    font-size:11px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--slate);
+    margin:0 0 6px;
+  }
+  .summary-card .value{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:20px;
+    font-weight:600;
+    font-variant-numeric:tabular-nums;
+  }
+  .summary-card .value.negative{color:var(--alert);}
+
+  /* --- Table --- */
+  table{width:100%;border-collapse:collapse;margin-top:18px;}
+  thead th{
+    text-align:left;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--slate);
+    border-bottom:1px solid var(--ink);
+    padding:8px 4px;
+  }
+  thead th.amount-col{text-align:right;}
+  tbody td{
+    padding:10px 4px;
+    border-bottom:1px solid var(--hairline);
+    font-size:14px;
+  }
+  tbody td.amount{
+    text-align:right;
+    font-family:'IBM Plex Mono',monospace;
+    font-variant-numeric:tabular-nums;
+  }
+  tbody tr:hover{background:var(--paper);}
+  tbody td.amount.negative{color:var(--alert);}
+
+  .empty-state{
+    padding:32px 4px;
+    text-align:center;
+    color:var(--slate);
+    font-size:14px;
+  }
+  .empty-state .big{
+    font-family:'Fraunces',serif;
+    font-size:20px;
+    color:var(--ink);
+    margin-bottom:6px;
+  }
+
+  canvas{margin-top:8px;max-height:280px;}
+
+  @media (max-width:560px){
+    .letterhead, section{padding:24px 20px;}
+    .summary-grid{grid-template-columns:1fr;}
+    .letterhead h1{font-size:26px;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;}
+  }
+</style>
 </head>
 <body>
-    <h2>Upload Financial Data</h2>
+<div class="sheet">
+
+  <div class="letterhead">
+    <p class="eyebrow">Statement of Monthly Finances</p>
+    <h1 id="pageTitle">Ledger</h1>
+    <p class="subtitle" id="pageSubtitle">Upload a year of monthly figures, then review the totals below.</p>
+  </div>
+
+  <section>
+    <h2 class="section-title">Upload &amp; view</h2>
     <form id="uploadForm">
-        <input type="file" id="file" accept=".xlsx" required>
-        <input type="number" id="userId" placeholder="User ID" required>
-        <input type="number" id="year" placeholder="Year" required>
-        <button type="submit">Upload</button>
+      <div class="field-row">
+        <div class="field user-id">
+          <label for="userId">User ID</label>
+          <input type="number" id="userId" min="1" step="1" required>
+        </div>
+        <div class="field year">
+          <label for="year">Year</label>
+          <input type="number" id="year" min="1900" max="2999" step="1" required>
+        </div>
+        <div class="field file">
+          <label for="file">File (.xlsx or .csv)</label>
+          <input type="file" id="file" accept=".xlsx,.csv">
+        </div>
+        <button type="submit" id="uploadBtn">Upload file</button>
+        <button type="button" class="secondary" id="loadBtn">Load existing data</button>
+      </div>
+      <p class="hint">File needs two columns: <strong>Month</strong> and <strong>Amount</strong>, with a header row. Duplicate months for the same user/year are skipped automatically.</p>
     </form>
-    <div id="resultMsg"></div>
-    <div id="errorMsg"></div>
+    <div id="status" role="status" aria-live="polite"></div>
+  </section>
 
-    <h2>Dashboard</h2>
-    <table id="dataTable">
-        <thead>
-            <tr><th>Month</th><th>Amount</th></tr>
-        </thead>
-        <tbody></tbody>
+  <section>
+    <h2 class="section-title" id="dashboardTitle">Dashboard</h2>
+
+    <div id="summaryGrid" class="summary-grid" style="display:none;">
+      <div class="summary-card">
+        <p class="label">Total for year</p>
+        <p class="value" id="totalValue">—</p>
+      </div>
+      <div class="summary-card">
+        <p class="label">Average per month</p>
+        <p class="value" id="avgValue">—</p>
+      </div>
+      <div class="summary-card">
+        <p class="label">Highest month</p>
+        <p class="value" id="peakValue">—</p>
+      </div>
+    </div>
+
+    <div id="emptyState" class="empty-state">
+      <p class="big">Nothing here yet</p>
+      <p>Enter a User ID and year above, then upload a file or load existing data to see the statement.</p>
+    </div>
+
+    <table id="dataTable" style="display:none;">
+      <thead>
+        <tr><th>Month</th><th class="amount-col">Amount</th></tr>
+      </thead>
+      <tbody></tbody>
     </table>
-    <canvas id="barChart" width="600" height="300"></canvas>
 
-    <script>
-        document.getElementById("uploadForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
+    <canvas id="barChart" style="display:none;"></canvas>
+  </section>
 
-            document.getElementById("resultMsg").textContent = "";
-            document.getElementById("errorMsg").textContent = "";
+</div>
 
-            let file = document.getElementById("file").files[0];
-            let userId = document.getElementById("userId").value.trim();
-            let year = document.getElementById("year").value.trim();
+<script>
+  // Change this if your backend runs somewhere other than 127.0.0.1:5000
+  const API_BASE = "http://127.0.0.1:5000";
 
-            if (!file || !userId || !year) {
-                document.getElementById("errorMsg").textContent = "Please fill in all fields and select a file.";
-                return;
-            }
+  const MONTH_ORDER = ["january","february","march","april","may","june",
+    "july","august","september","october","november","december"];
 
-            let formData = new FormData();
-            formData.append("file", file);
+  const els = {
+    form: document.getElementById("uploadForm"),
+    userId: document.getElementById("userId"),
+    year: document.getElementById("year"),
+    file: document.getElementById("file"),
+    uploadBtn: document.getElementById("uploadBtn"),
+    loadBtn: document.getElementById("loadBtn"),
+    status: document.getElementById("status"),
+    dashboardTitle: document.getElementById("dashboardTitle"),
+    summaryGrid: document.getElementById("summaryGrid"),
+    totalValue: document.getElementById("totalValue"),
+    avgValue: document.getElementById("avgValue"),
+    peakValue: document.getElementById("peakValue"),
+    emptyState: document.getElementById("emptyState"),
+    table: document.getElementById("dataTable"),
+    tableBody: document.querySelector("#dataTable tbody"),
+    chart: document.getElementById("barChart"),
+  };
 
-            try {
-                let uploadRes = await fetch(`http://127.0.0.1:5000/api/finances/upload/${userId}/${year}`, {
-                    method: "POST",
-                    body: formData
-                });
+  const currency = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
+  let chartInstance = null;
 
-                let uploadData = await uploadRes.json();
-                if (!uploadRes.ok) {
-                    document.getElementById("errorMsg").textContent = uploadData.error || "Upload failed.";
-                    return;
-                } else {
-                    document.getElementById("resultMsg").textContent = 
-                        `Upload successful: ${uploadData.inserted} inserted, ${uploadData.skipped} skipped.`;
-                }
+  // Remember the last user/year looked at so a page refresh doesn't lose it.
+  try {
+    const last = JSON.parse(localStorage.getItem("ledger:last") || "{}");
+    if (last.userId) els.userId.value = last.userId;
+    if (last.year) els.year.value = last.year;
+  } catch (e) { /* ignore malformed storage */ }
 
-                let res = await fetch(`http://127.0.0.1:5000/api/finances/${userId}/${year}`);
-                let data = await res.json();
+  function rememberLast(userId, year) {
+    try { localStorage.setItem("ledger:last", JSON.stringify({ userId, year })); } catch (e) {}
+  }
 
-                let tableBody = document.querySelector("#dataTable tbody");
-                tableBody.innerHTML = "";
-                let labels = [], values = [];
+  function setStatus(message, type) {
+    els.status.textContent = message;
+    els.status.className = message ? `show ${type}` : "";
+  }
 
-                data.forEach(r => {
-                    let row = `<tr><td>${r.month}</td><td>${r.amount}</td></tr>`;
-                    tableBody.innerHTML += row;
-                    labels.push(r.month);
-                    values.push(r.amount);
-                });
+  function setBusy(busy, label) {
+    els.uploadBtn.disabled = busy;
+    els.loadBtn.disabled = busy;
+    if (busy) els.uploadBtn.dataset.prevLabel = els.uploadBtn.textContent;
+    els.uploadBtn.textContent = busy ? (label || "Working…") : (els.uploadBtn.dataset.prevLabel || "Upload file");
+  }
 
-                let ctx = document.getElementById("barChart").getContext("2d");
-                if (window.barChartInstance) {
-                    window.barChartInstance.destroy();
-                }
-                window.barChartInstance = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: "Monthly Amount",
-                            data: values,
-                            backgroundColor: "rgba(54, 162, 235, 0.6)",
-                            borderColor: "rgba(54, 162, 235, 1)",
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        scales: {
-                            y: {
-                                beginAtZero: true
-                            }
-                        }
-                    }
-                });
-            } catch (err) {
-                console.error("Error:", err);
-                document.getElementById("errorMsg").textContent = "Something went wrong while uploading or fetching data.";
-            }
-        });
-    </script>
+  function sortByMonth(records) {
+    return [...records].sort((a, b) => {
+      const ai = MONTH_ORDER.indexOf(String(a.month).toLowerCase());
+      const bi = MONTH_ORDER.indexOf(String(b.month).toLowerCase());
+      if (ai === -1 && bi === -1) return String(a.month).localeCompare(String(b.month));
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  }
+
+  function renderRecords(records, userName) {
+    const sorted = sortByMonth(records);
+
+    els.dashboardTitle.textContent = userName ? `Dashboard — ${userName}` : "Dashboard";
+
+    if (sorted.length === 0) {
+      els.emptyState.style.display = "block";
+      els.table.style.display = "none";
+      els.chart.style.display = "none";
+      els.summaryGrid.style.display = "none";
+      if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+      return;
+    }
+
+    els.emptyState.style.display = "none";
+    els.table.style.display = "table";
+    els.chart.style.display = "block";
+    els.summaryGrid.style.display = "grid";
+
+    // Table
+    els.tableBody.innerHTML = "";
+    sorted.forEach(r => {
+      const amt = Number(r.amount);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${escapeHtml(r.month)}</td><td class="amount${amt < 0 ? " negative" : ""}">${currency.format(amt)}</td>`;
+      els.tableBody.appendChild(tr);
+    });
+
+    // Summary
+    const amounts = sorted.map(r => Number(r.amount));
+    const total = amounts.reduce((a, b) => a + b, 0);
+    const avg = total / amounts.length;
+    const peakIdx = amounts.reduce((best, v, i) => (v > amounts[best] ? i : best), 0);
+
+    els.totalValue.textContent = currency.format(total);
+    els.totalValue.classList.toggle("negative", total < 0);
+    els.avgValue.textContent = currency.format(avg);
+    els.avgValue.classList.toggle("negative", avg < 0);
+    els.peakValue.textContent = `${sorted[peakIdx].month} (${currency.format(amounts[peakIdx])})`;
+
+    // Chart
+    const ctx = els.chart.getContext("2d");
+    if (chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: sorted.map(r => r.month),
+        datasets: [{
+          label: "Monthly amount",
+          data: amounts,
+          backgroundColor: amounts.map(v => v < 0 ? "rgba(163,52,42,0.55)" : "rgba(14,110,85,0.6)"),
+          borderColor: amounts.map(v => v < 0 ? "rgba(163,52,42,1)" : "rgba(14,110,85,1)"),
+          borderWidth: 1,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { callback: (v) => currency.format(v) },
+          },
+        },
+      },
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function validateUserAndYear() {
+    const userId = els.userId.value.trim();
+    const year = els.year.value.trim();
+    if (!userId || !year) {
+      setStatus("Enter both a User ID and a year first.", "error");
+      return null;
+    }
+    return { userId, year };
+  }
+
+  async function loadData(userId, year) {
+    const res = await fetch(`${API_BASE}/api/finances/${userId}/${year}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Could not load data.");
+    return data;
+  }
+
+  els.loadBtn.addEventListener("click", async () => {
+    const v = validateUserAndYear();
+    if (!v) return;
+    setBusy(true, "Loading…");
+    setStatus("", "");
+    try {
+      const data = await loadData(v.userId, v.year);
+      rememberLast(v.userId, v.year);
+      renderRecords(data, data[0]?.name);
+      setStatus(data.length ? `Loaded ${data.length} record(s).` : "No records found for that user and year yet.", data.length ? "success" : "info");
+    } catch (err) {
+      setStatus(err.message || "Something went wrong while loading data.", "error");
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  els.form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    setStatus("", "");
+
+    const v = validateUserAndYear();
+    if (!v) return;
+
+    const file = els.file.files[0];
+    if (!file) {
+      setStatus("Choose a .xlsx or .csv file to upload.", "error");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setBusy(true, "Uploading…");
+    try {
+      const uploadRes = await fetch(`${API_BASE}/api/finances/upload/${v.userId}/${v.year}`, {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        setStatus(uploadData.error || "Upload failed.", "error");
+        return;
+      }
+
+      setStatus(`Upload processed: ${uploadData.inserted} inserted, ${uploadData.skipped} skipped.`, "success");
+      rememberLast(v.userId, v.year);
+
+      const data = await loadData(v.userId, v.year);
+      renderRecords(data, data[0]?.name);
+    } catch (err) {
+      console.error(err);
+      setStatus("Something went wrong while uploading or fetching data.", "error");
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  // If we already have a remembered user/year, load their dashboard on page open.
+  window.addEventListener("DOMContentLoaded", () => {
+    if (els.userId.value && els.year.value) {
+      els.loadBtn.click();
+    }
+  });
+</script>
 </body>
 </html>
