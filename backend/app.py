@@ -65,7 +65,7 @@ def handle_http_error(e):
 
 @app.errorhandler(Exception)
 def handle_unexpected_error(e):
-    logger.exception("Unhandled error on %s %s", request method, request.path%s)
+    logger.exception("Unhandled error on %s %s", request.method, request.path)
     return jsonify({"error": "Internal server error"}), 500
 
 # def normalize_month(value):
@@ -93,10 +93,101 @@ def get_db_connection(testing=False):
             database=db_name,
             autocommit=False,
         )
-        return conn
     except mysql.connector.Error as e:
         logger.error("DB connection error (%s): %s", db_name, e)
         return None
+
+# === Parsing & validation ===
+class UploadError(Exception):
+    """A Problem with the uoloaded file itself; message is safe to show users."""
+    
+def normalize_month(value):
+    """Map 'january', 'jan', 'JANUARY', etc. to 'January'."""
+    return MONTH_LOOKUP.get(str(value).strip().lower())
+
+def parse_amount(value):
+    """"Return a Decimal round to 2dp, or raise VAlueError with a reason."""
+    if isinstance (value, bool):
+        raise ValueError(f"amount is not a number")
+    try:
+        amount = Decimal(str(value).strip().replace(",", ""))
+    except InvalidOperation:
+        raise ValueError(f"amount '{value}' is not a number")
+    if not amount.is_finite():
+        raise ValueError(f"amount '{value}' is not a finite number")
+    if abs(amount) > MAX_ABS_AMOUNT:
+        raise ValueError(f"amount '{value}' exceeds max allowed {MAX_ABS_AMOUNT}")
+    return amount
+
+def is_xlsx(data):
+    """Return True if the bytes appear to be an XLSX file (starts with PK)."""
+    return data[:2] == b'PK'
+
+def detect_delimiter(text):
+    """Return the delimiter of a CSV-llike header line, or None if it can't be determined."""
+    first_line = next((line for line in text.splitlines() if line.strip()), "")
+    for delimiter in (",", "\t", ";"):
+        if delimiter in first_line:
+            return delimiter
+    return None
+
+def parse_xlsx(raw_bytes):
+    """Return a list of (month, amount) tuples from an XLSX file."""
+    try:
+        workbook = openpyxl.load_workbook(io.BytesIO(raw_bytes), read_only=True, data_only=True)
+        sheet = workbook.active
+        rows = [
+            (row[0], row[1])
+            for row in sheet.iter_rows(min_row=2, max_col=2, values_only=True)
+            if row and len(row) >= 2 and not (row[0] is None and row[1] is None)
+        ]
+        workbook.close()
+        return rows
+    except Exception:
+        logger.warning("Could not read uploaded XLSX", exc_info=True)
+        raise UploadError("Could not read the Excel file. Is it a valid .xlsx workbook?")
+
+def parse_csv(raw_bytes):
+    try:
+        text = raw-bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise UploadError("Unsupported file formate — must be UTF-8 encoded CSV or XLSX")
+    
+    reader = csv.reader(io.StringIO(text)), delimiter=delimiter
+    headers = next (reader, None)
+    if not headers or len(headers) < 2:
+        raise UploadError("Unsupported CSV format — must have at least two columns (month, amount)")
+    return [
+        (row[0], row[1])
+        for row in reader
+        if len(row) >= 2 and not (row[0] is None and row[1] is None)
+    ]
+    
+def validate_rows(raw_rows):
+    valid, problems = [], []
+    for index, (raw_month, raw_amount) in enumerate(raw_rows, start=2):
+        month = normalize_month(raw_month) if raw_month is not None else None
+        if month is None:
+            problems.append({"row": index, "reason": f"'{raw_month}' is not a recognised month"})
+            continue
+        if raw_amount is None or str(raw_amount).strip() == "":
+            problems.append({"row": index, "reason": "amount is missing"})
+            continue
+        try:
+            valid.append((month, parse_amount(raw_amount)))
+        except ValueError as e:
+            problems.append({"row": index, "reason": str(e)})
+    return valid, problems
+
+# === Routes ===
+@app.route("/api/health", methods=["GET"])
+def health():
+    """Liveness/readiness probe used by Docker and CI."""
+    conn = get_db_connection(testing=app.config.get("TESTING", False))
+    if conn is None:
+        return jsonify({"status": "degraded", "database": "down"}), 503
+    conn.close()
+    return jsonify({"status": "ok", "database": "up"}), 200
 
 
 # === Upload Excel File ===
