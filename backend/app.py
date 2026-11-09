@@ -45,19 +45,39 @@ MONTHS = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
 ]
+
 # Accepts full names and 3- letter abbreviations("Jan", "Sept")
+
 MONTH_LOOKUP = {}
+for _m in MONTHS:
+    MONTH_LOOKUP[_m.lower()] = _m
+    MONTH_LOOKUP[_m[:3].lower()] = _m
+MONTH_LOOKUP["sept"] = "September"  # Special case for September abbreviation
 
-def normalize_month(value):
-    """Trim whitespace and title-case month names so 'january', ' January ',
-    and 'JANUARY' are all treated as the same month instead of creating
-    duplicate rows."""
-    return str(value).strip().title()
+# === Error Handling ===
+@app.errorhandler(HTTPException)
+def handle_http_error(e):
+    if e.code == 413:
+        message = f"File is too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)} MB)"
+    else:
+        message = e.description
+    return jsonify({"error": message}), e.code
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(e):
+    logger.exception("Unhandled error on %s %s", request method, request.path%s)
+    return jsonify({"error": "Internal server error"}), 500
+
+# def normalize_month(value):
+#     """Trim whitespace and title-case month names so 'january', ' January ',
+#     and 'JANUARY' are all treated as the same month instead of creating
+#     duplicate rows."""
+#     return str(value).strip().title()
 
 
-@app.errorhandler(413)
-def file_too_large(e):
-    return jsonify({"error": "File is too large (max 10 MB)"}), 413
+# @app.errorhandler(413)
+# def file_too_large(e):
+#     return jsonify({"error": "File is too large (max 10 MB)"}), 413
 
 
 # === Database Connection ===
@@ -67,6 +87,7 @@ def get_db_connection(testing=False):
     try:
         conn = mysql.connector.connect(
             host=DB_HOST,
+            port=DB_PORT,
             user=DB_USER,
             password=DB_PASSWORD,
             database=db_name,
@@ -74,8 +95,7 @@ def get_db_connection(testing=False):
         )
         return conn
     except mysql.connector.Error as e:
-        if not app.config.get("TESTING"):
-            print(f"DB connection error ({db_name}): {e}")
+        logger.error("DB connection error (%s): %s", db_name, e)
         return None
 
 
