@@ -21,12 +21,20 @@ class FinancialAppTestCase(unittest.TestCase):
         self.assertIn(b'Empty filename', response.data)
 
     def test_upload_invalid_excel_format(self):
-        """Should return 400 if the uploaded file is not a valid .xlsx Excel file."""
-        # Upload a plain text file with .xlsx extension
+        """Should return 400 if the uploaded file is plain text, even when
+        named like an Excel file (renaming a .txt to .xlsx shouldn't fool
+        the upload endpoint)."""
         data = {'file': (BytesIO(b'not an excel file'), 'invalid.xlsx')}
         response = self.client.post('/api/finances/upload/1/2025', data=data, content_type='multipart/form-data')
         self.assertEqual(response.status_code, 400)
-        self.assertIn(b'Invalid Excel file format', response.data)
+        self.assertIn(b'Unsupported file format', response.data)
+
+    def test_upload_rejects_non_tabular_text(self):
+        """A .csv-named file with no delimiters at all should be rejected
+        rather than silently accepted as one giant 'month' column."""
+        data = {'file': (BytesIO(b'just some free text with no commas'), 'notes.csv')}
+        response = self.client.post('/api/finances/upload/1/2025', data=data, content_type='multipart/form-data')
+        self.assertEqual(response.status_code, 400)
 
     def test_get_records(self):
         """Should return 200 and a list (may be empty) for valid user/year."""
